@@ -5,7 +5,10 @@ import json
 
 app = FastAPI()
 
-client = MongoClient("mongodb+srv://nongcalljai-admin:NongCall2026!@nongcalljai.kbb0yds.mongodb.net/nongcalljai")
+client = MongoClient(
+    "mongodb+srv://nongcalljai-admin:NongCall2026!@nongcalljai.kbb0yds.mongodb.net/nongcalljai",
+    tlsAllowInvalidCertificates=True
+)
 db = client["nongcalljai"]
 
 def fix_doc(doc):
