@@ -102,6 +102,6 @@ def save_message(body: dict):
         return {"error": "กรุณาส่ง session_id และ message"}
     db["callsummaries"].update_one(
         {"callSessionId": session_id},
-        {"$set": {"caringMessage": message}}
+        {"": {"caringMessage": message}}
     )
     return {"success": True}
