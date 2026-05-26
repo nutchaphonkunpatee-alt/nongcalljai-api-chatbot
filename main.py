@@ -22,80 +22,78 @@ def root():
 @app.get("/api/stats")
 def get_stats():
     return {
-        "users": db["users"].count_documents({}),
+        "elders": db["elderprofiles"].count_documents({}),
         "calls": db["callsummaries"].count_documents({}),
         "answers": db["callanswers"].count_documents({})
     }
 
-# ดึงรายงานล่าสุดของผู้สูงอายุ
 @app.get("/api/report")
-def get_report(elder_id: str = Query(None), phone: str = Query(None)):
-    if not elder_id and not phone:
-        return {"error": "กรุณาส่ง elder_id หรือ phone"}
+def get_report(phone: str = Query(None), elder_id: str = Query(None)):
+    if not phone and not elder_id:
+        return {"error": "กรุณาส่ง phone หรือ elder_id"}
 
-    # หา elder จาก phone
-    if phone and not elder_id:
-        elder = db["elders"].find_one({"phone": phone})
+    if phone:
+        elder = db["elderprofiles"].find_one({"phone": phone})
         if not elder:
             return {"error": "ไม่พบผู้สูงอายุเบอร์: " + phone}
         elder_id = str(elder["_id"])
 
-    # หา callSession ล่าสุด
-    session = db["callsessions"].find_one(
-        {"elderId": elder_id},
-        sort=[("createdAt", -1)]
+    try:
+        oid = ObjectId(elder_id)
+    except:
+        return {"error": "elder_id ไม่ถูกต้อง"}
+
+    session = db["voicecallsessions"].find_one(
+        {"elderId": oid},
+        sort=[("startedAt", -1)]
     )
     if not session:
-        return {"error": "ยังไม่มีข้อมูลการโทรของ: " + elder_id}
+        return {"error": "ยังไม่มีข้อมูลการโทร"}
 
-    session_id = str(session["_id"])
-
-    # หา summary
+    session_id = session["_id"]
     summary = db["callsummaries"].find_one({"callSessionId": session_id})
-
-    # หา answers
     answers = list(db["callanswers"].find({"callSessionId": session_id}))
 
+    questions = {str(q["_id"]): q.get("questionKey","") for q in db["carequestions"].find({})}
+
+    answer_map = {}
+    for a in answers:
+        qid = str(a.get("questionId",""))
+        key = questions.get(qid, qid)
+        val = a.get("valueText") or a.get("valueNumber") or a.get("valueBool")
+        answer_map[key] = val
+
     return {
-        "elder_id": elder_id,
-        "session_id": session_id,
-        "summary": fix_doc(summary) if summary else {},
-        "answers": [fix_doc(a) for a in answers]
+        "patient_name": elder["name"] if phone else "",
+        "food_detail": answer_map.get("meal_detail", ""),
+        "medicine_detail": answer_map.get("medication_detail", ""),
+        "routine_detail": answer_map.get("today_activity", ""),
+        "message_back": fix_doc(summary).get("caringMessage", "") if summary else "",
+        "summary_status": fix_doc(summary).get("summaryText", "") if summary else "",
+        "safe_note": fix_doc(summary).get("safeNote", "") if summary else "",
+        "ate_food": 1 if answer_map.get("appetite") == True else 0,
+        "took_medicine": 1 if answer_map.get("medication_taken") == True else 0,
+        "pain_level": answer_map.get("pain_level", 0),
     }
 
-# ดึงข้อมูล caregiver จาก phone
-@app.get("/api/caregiver")
-def get_caregiver(phone: str = Query(None)):
-    if not phone:
-        return {"error": "กรุณาส่ง phone"}
-    user = db["users"].find_one({"phone": phone})
-    if not user:
-        return {"error": "ไม่พบ caregiver เบอร์: " + phone}
-    return fix_doc(user)
-
-# ดึงรายชื่อ caregiver ทั้งหมด
 @app.get("/api/users")
 def get_users():
     return [fix_doc(u) for u in db["users"].find({}).limit(10)]
 
-# ดึง callsummaries ทั้งหมด
 @app.get("/api/calls")
 def get_calls():
     return [fix_doc(c) for c in db["callsummaries"].find({}).limit(10)]
 
-# ดึง callanswers ทั้งหมด
-@app.get("/api/answers")
-def get_answers():
-    return [fix_doc(a) for a in db["callanswers"].find({}).limit(10)]
+@app.get("/api/elders")
+def get_elders():
+    return [fix_doc(e) for e in db["elderprofiles"].find({}).limit(10)]
 
-# บันทึก log จาก Voicebot
 @app.post("/api/saveLog")
 def save_log(body: dict):
     body["createdAt"] = datetime.now().isoformat()
     result = db["callsummaries"].insert_one(body)
     return {"success": True, "id": str(result.inserted_id)}
 
-# บันทึกข้อความจากลูกหลาน
 @app.post("/api/saveMessage")
 def save_message(body: dict):
     session_id = body.get("session_id")
@@ -104,6 +102,6 @@ def save_message(body: dict):
         return {"error": "กรุณาส่ง session_id และ message"}
     db["callsummaries"].update_one(
         {"callSessionId": session_id},
-        {"\": {"caringMessage": message}}
+        {"$set": {"caringMessage": message}}
     )
     return {"success": True}
