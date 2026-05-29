@@ -120,7 +120,7 @@ def get_report(
         "message_back": fix_doc(summary).get("caringMessage", "") if summary else "",
         "summary_status": fix_doc(summary).get("summaryText", "") if summary else "",
         "safe_note": fix_doc(summary).get("safeNote", "") if summary else "",
-        "ate_food": 1 if answer_map.get("appetite") == True else 0,
+        "ate_food": 1 if answer_map.get("meal_detail") else 0,
         "took_medicine": 1 if answer_map.get("medication_taken") == True else 0,
         "pain_level": answer_map.get("pain_level", 0),
     }
