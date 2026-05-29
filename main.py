@@ -112,16 +112,19 @@ def get_report(
         val = a.get("valueText") or a.get("valueNumber") or a.get("valueBool")
         answer_map[key] = val
 
+    s = fix_doc(summary) if summary else {}
+    meal = s.get("meal", "")
+    med = s.get("medication_status", "")
     return {
         "patient_name": elder.get("name", ""),
-        "food_detail": answer_map.get("meal_detail", ""),
-        "medicine_detail": answer_map.get("medication_detail", ""),
-        "routine_detail": answer_map.get("today_activity", ""),
-        "message_back": fix_doc(summary).get("caringMessage", "") if summary else "",
-        "summary_status": fix_doc(summary).get("summaryText", "") if summary else "",
-        "safe_note": fix_doc(summary).get("safeNote", "") if summary else "",
-        "ate_food": 1 if answer_map.get("meal_detail") else 0,
-        "took_medicine": 1 if answer_map.get("medication_taken") == True else 0,
+        "food_detail": meal,
+        "medicine_detail": med,
+        "routine_detail": s.get("today_activity", ""),
+        "message_back": s.get("caringMessage", ""),
+        "summary_status": s.get("summaryText", ""),
+        "safe_note": s.get("safeNote", ""),
+        "ate_food": 1 if meal else 0,
+        "took_medicine": 1 if med and "ยังไม่" not in med and "ลืม" not in med else 0,
         "pain_level": answer_map.get("pain_level", 0),
     }
 
